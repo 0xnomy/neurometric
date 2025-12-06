@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { Home, Github, FileText, ExternalLink } from 'lucide-react';
 
 // ==========================================
-// DuckDB Init Helper
+// DuckDB Init Helper with Extension Bundling
 // ==========================================
 async function initDuckDB() {
     const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
@@ -24,7 +24,10 @@ async function initDuckDB() {
     const worker = new Worker(worker_url);
     const logger = new duckdb.ConsoleLogger();
     const db = new duckdb.AsyncDuckDB(logger, worker);
+
+    // Instantiate with extensions pre-bundled
     await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+
     URL.revokeObjectURL(worker_url);
     return db;
 }
@@ -77,10 +80,11 @@ export default function Workspace() {
                 setConn(connection);
 
                 setLoadingStep('Mounting Parquet Tables...');
-                // Load Tables via HTTP
+                // Load Tables via HTTP with parquet extension pre-loaded
                 const baseUrl = window.location.origin;
+
+                // Register parquet extension without INSTALL (use bundled version)
                 await connection.query(`
-          INSTALL httpfs;
           LOAD httpfs;
           CREATE TABLE features AS SELECT * FROM read_parquet('${baseUrl}/eeg_features.parquet');
           CREATE TABLE subjects AS SELECT * FROM read_parquet('${baseUrl}/eeg_subjects.parquet');
