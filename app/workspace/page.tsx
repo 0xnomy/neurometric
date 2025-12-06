@@ -2,13 +2,17 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Database, Activity, Terminal, Play, Loader2, ChevronRight, Layout, Brain, Table2, BarChart3, AlertCircle } from 'lucide-react';
+import { Send, Activity, Terminal, Loader2, ChevronRight, Brain, Table2 } from 'lucide-react';
 import * as duckdb from '@duckdb/duckdb-wasm';
 import MethodologyModal from '../components/MethodologyModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
 import { Home, Github, FileText, ExternalLink } from 'lucide-react';
+import dynamic from 'next/dynamic';
+
+const ThreeBrain = dynamic(() => import('../components/ThreeBrain'), { ssr: false });
+const Topomap = dynamic(() => import('../components/Topomap'), { ssr: false });
 
 // ==========================================
 // DuckDB Init Helper with Extension Bundling
@@ -40,14 +44,14 @@ type Message = {
     role: 'user' | 'assistant' | 'system';
     content: string;
     sql?: string;
-    data?: any[];
+    data?: Record<string, unknown>[];
     insight?: string;
     timestamp: number;
 };
 
 export default function Workspace() {
     // State
-    const [db, setDb] = useState<duckdb.AsyncDuckDB | null>(null);
+    const [, setDb] = useState<duckdb.AsyncDuckDB | null>(null);
     const [conn, setConn] = useState<duckdb.AsyncDuckDBConnection | null>(null);
     const [isReady, setIsReady] = useState(false);
     const [loadingStep, setLoadingStep] = useState('Initializing Engine...');
@@ -62,7 +66,7 @@ export default function Workspace() {
     ]);
     const [input, setInput] = useState('');
     const [processing, setProcessing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'table' | 'chart'>('table');
+    const [activeTab, setActiveTab] = useState<'table' | 'raw' | 'brain' | 'topomap'>('table');
     const [showMethodology, setShowMethodology] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -136,7 +140,7 @@ export default function Workspace() {
             if (plan.sql) {
                 try {
                     const arrowResult = await conn.query(plan.sql);
-                    const resultData = arrowResult.toArray().map((row: any) => row.toJSON());
+                    const resultData = arrowResult.toArray().map((row: unknown) => (row as { toJSON: () => Record<string, unknown> }).toJSON());
                     assistantMsg.data = resultData;
 
                     // 3. Insight Agent
@@ -246,19 +250,19 @@ export default function Workspace() {
                                 )}
 
                                 <div className="prose prose-invert prose-sm max-w-none">
-                                    <ReactMarkdown 
+                                    <ReactMarkdown
                                         remarkPlugins={[remarkGfm]}
                                         components={{
-                                            h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
-                                            h2: ({node, ...props}) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
-                                            h3: ({node, ...props}) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
-                                            h4: ({node, ...props}) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
-                                            p: ({node, ...props}) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
-                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                            ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                            li: ({node, ...props}) => <li className="text-slate-300" {...props} />,
-                                            strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
-                                            em: ({node, ...props}) => <em className="italic text-slate-200" {...props} />,
+                                            h1: ({ ...props }) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
+                                            h2: ({ ...props }) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
+                                            h3: ({ ...props }) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
+                                            h4: ({ ...props }) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
+                                            p: ({ ...props }) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
+                                            ul: ({ ...props }) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                            ol: ({ ...props }) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                            li: ({ ...props }) => <li className="text-slate-300" {...props} />,
+                                            strong: ({ ...props }) => <strong className="font-bold text-white" {...props} />,
+                                            em: ({ ...props }) => <em className="italic text-slate-200" {...props} />,
                                         }}
                                     >
                                         {msg.content}
@@ -280,19 +284,19 @@ export default function Workspace() {
                                             <Activity className="w-3 h-3" /> Cognitive Insight
                                         </div>
                                         <div className="prose prose-invert prose-sm max-w-none">
-                                            <ReactMarkdown 
+                                            <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
-                                                    h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
-                                                    h2: ({node, ...props}) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
-                                                    h3: ({node, ...props}) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
-                                                    h4: ({node, ...props}) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
-                                                    p: ({node, ...props}) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
-                                                    ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                                    ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                                    li: ({node, ...props}) => <li className="text-slate-300" {...props} />,
-                                                    strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
-                                                    em: ({node, ...props}) => <em className="italic text-slate-200" {...props} />,
+                                                    h1: ({ ...props }) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
+                                                    h2: ({ ...props }) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
+                                                    h3: ({ ...props }) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
+                                                    h4: ({ ...props }) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
+                                                    p: ({ ...props }) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
+                                                    ul: ({ ...props }) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                                    ol: ({ ...props }) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                                    li: ({ ...props }) => <li className="text-slate-300" {...props} />,
+                                                    strong: ({ ...props }) => <strong className="font-bold text-white" {...props} />,
+                                                    em: ({ ...props }) => <em className="italic text-slate-200" {...props} />,
                                                 }}
                                             >
                                                 {msg.insight}
@@ -311,16 +315,28 @@ export default function Workspace() {
                                                 Table
                                             </button>
                                             <button
-                                                onClick={() => setActiveTab('chart')}
-                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'chart' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                onClick={() => setActiveTab('brain')}
+                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'brain' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                                             >
-                                                Raw View
+                                                3D Brain
+                                            </button>
+                                            <button
+                                                onClick={() => setActiveTab('topomap')}
+                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'topomap' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                            >
+                                                Topomap
+                                            </button>
+                                            <button
+                                                onClick={() => setActiveTab('raw')}
+                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'raw' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                            >
+                                                Raw
                                             </button>
                                         </div>
 
-                                        <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden">
-                                            {activeTab === 'table' ? (
-                                                <div className="overflow-x-auto max-h-60 custom-scrollbar">
+                                        <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden min-h-[300px]">
+                                            {activeTab === 'table' && (
+                                                <div className="overflow-x-auto max-h-96 custom-scrollbar">
                                                     <table className="w-full text-xs text-left">
                                                         <thead className="bg-slate-900 text-slate-400 sticky top-0">
                                                             <tr>
@@ -330,9 +346,9 @@ export default function Workspace() {
                                                             </tr>
                                                         </thead>
                                                         <tbody className="divide-y divide-slate-800 text-slate-300">
-                                                            {msg.data.slice(0, 10).map((row: any, i: number) => (
+                                                            {msg.data.slice(0, 10).map((row: Record<string, unknown>, i: number) => (
                                                                 <tr key={i} className="hover:bg-slate-900/50">
-                                                                    {Object.values(row).map((v: any, j) => (
+                                                                    {Object.values(row).map((v: unknown, j) => (
                                                                         <td key={j} className="p-2 whitespace-nowrap">
                                                                             {typeof v === 'number' ? (v % 1 !== 0 ? v.toFixed(3) : v) : String(v)}
                                                                         </td>
@@ -347,7 +363,21 @@ export default function Workspace() {
                                                         </div>
                                                     )}
                                                 </div>
-                                            ) : (
+                                            )}
+
+                                            {activeTab === 'brain' && (
+                                                <div className="h-[400px]">
+                                                    <ThreeBrain data={parseChannelData(msg.data)} />
+                                                </div>
+                                            )}
+
+                                            {activeTab === 'topomap' && (
+                                                <div className="h-[400px]">
+                                                    <Topomap data={parseChannelData(msg.data)} />
+                                                </div>
+                                            )}
+
+                                            {activeTab === 'raw' && (
                                                 <pre className="p-3 text-xs text-slate-400 overflow-auto max-h-60">
                                                     {JSON.stringify(msg.data.slice(0, 5), null, 2)}
                                                 </pre>
@@ -391,11 +421,11 @@ export default function Workspace() {
                         </button>
                     </div>
                     <div className="max-w-4xl mx-auto mt-2 flex gap-4 text-xs text-slate-500 justify-center">
-                        <span>Try: "Subject s01 alpha power"</span>
+                        <span>Try: &ldquo;Subject s01 alpha power&rdquo;</span>
                         <span>•</span>
-                        <span>"Highest beta channel"</span>
+                        <span>&ldquo;Highest beta channel&rdquo;</span>
                         <span>•</span>
-                        <span>"Correlate entropy and theta"</span>
+                        <span>&ldquo;Correlate entropy and theta&rdquo;</span>
                     </div>
                 </div>
             </div>
@@ -407,6 +437,49 @@ export default function Workspace() {
     );
 }
 
+function parseChannelData(data: Record<string, unknown>[]): Record<string, number> {
+    if (!data || data.length === 0) return {};
+
+    // Strategy 1: Row has 'channel' and numerical value column
+    // e.g. [{channel: 'Fp1', alpha: 0.5}, ...]
+    if ('channel' in data[0]) {
+        const result: Record<string, number> = {};
+        // Find the first numerical key that isn't 'channel' or 'subject' or 'window_idx'
+        const valueKey = Object.keys(data[0]).find(k =>
+            k !== 'channel' && k !== 'subject' && k !== 'window_idx' && typeof data[0][k] === 'number'
+        );
+
+        if (valueKey) {
+            data.forEach(row => {
+                if (typeof row.channel === 'string') {
+                    result[row.channel] = Number(row[valueKey]);
+                }
+            });
+            return result;
+        }
+    }
+
+    // Strategy 2: Keys ARE channels (Wide format)
+    // e.g. [{Fp1: 0.5, Fp2: 0.6, ...}]
+    // We take the first row (or average if multiple?)
+    // For visualization, usually we visualize one specific moment or aggregate.
+    // Let's take the first row.
+    const potentialChannels = ['Fp1', 'Fp2', 'F3', 'F4', 'F7', 'F8', 'T3', 'T4', 'C3', 'C4', 'T5', 'T6', 'P3', 'P4', 'O1', 'O2', 'Fz', 'Cz', 'Pz'];
+    const row = data[0];
+    const result: Record<string, number> = {};
+    let found = false;
+
+    potentialChannels.forEach(ch => {
+        if (ch in row && typeof row[ch] === 'number') {
+            result[ch] = row[ch];
+            found = true;
+        }
+    });
+
+    if (found) return result;
+
+    return {};
+}
 function SchemaTable({ name, cols }: { name: string, cols: string[] }) {
     const [expanded, setExpanded] = useState(false);
 
