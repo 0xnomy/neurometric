@@ -245,8 +245,22 @@ export default function Workspace() {
                                     </div>
                                 )}
 
-                                <div className="prose prose-invert prose-sm max-w-none [&>ul]:list-disc [&>ul]:pl-4 [&>ol]:list-decimal [&>ol]:pl-4">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                <div className="prose prose-invert prose-sm max-w-none">
+                                    <ReactMarkdown 
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
+                                            h2: ({node, ...props}) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
+                                            h3: ({node, ...props}) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
+                                            h4: ({node, ...props}) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
+                                            p: ({node, ...props}) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
+                                            ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                            ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                            li: ({node, ...props}) => <li className="text-slate-300" {...props} />,
+                                            strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
+                                            em: ({node, ...props}) => <em className="italic text-slate-200" {...props} />,
+                                        }}
+                                    >
                                         {msg.content}
                                     </ReactMarkdown>
                                 </div>
@@ -265,7 +279,25 @@ export default function Workspace() {
                                         <div className="flex items-center gap-2 mb-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
                                             <Activity className="w-3 h-3" /> Cognitive Insight
                                         </div>
-                                        <p className="text-slate-300 text-sm leading-relaxed">{msg.insight}</p>
+                                        <div className="prose prose-invert prose-sm max-w-none">
+                                            <ReactMarkdown 
+                                                remarkPlugins={[remarkGfm]}
+                                                components={{
+                                                    h1: ({node, ...props}) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
+                                                    h2: ({node, ...props}) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
+                                                    h3: ({node, ...props}) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
+                                                    h4: ({node, ...props}) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
+                                                    p: ({node, ...props}) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
+                                                    ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                                    ol: ({node, ...props}) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
+                                                    li: ({node, ...props}) => <li className="text-slate-300" {...props} />,
+                                                    strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
+                                                    em: ({node, ...props}) => <em className="italic text-slate-200" {...props} />,
+                                                }}
+                                            >
+                                                {msg.insight}
+                                            </ReactMarkdown>
+                                        </div>
                                     </div>
                                 )}
 
@@ -302,7 +334,7 @@ export default function Workspace() {
                                                                 <tr key={i} className="hover:bg-slate-900/50">
                                                                     {Object.values(row).map((v: any, j) => (
                                                                         <td key={j} className="p-2 whitespace-nowrap">
-                                                                            {typeof v === 'number' ? (v % 1 !== 0 ? v.toExponential(2) : v) : String(v)}
+                                                                            {typeof v === 'number' ? (v % 1 !== 0 ? v.toFixed(3) : v) : String(v)}
                                                                         </td>
                                                                     ))}
                                                                 </tr>
