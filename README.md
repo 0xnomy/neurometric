@@ -71,46 +71,6 @@ GROQ_API_KEY=your_groq_api_key_here
 
 Get your Groq API key from [https://console.groq.com/keys](https://console.groq.com/keys)
 
-## Deployment to Vercel
-
-### Prerequisites
-- Vercel account ([vercel.com](https://vercel.com))
-- Groq API key ([console.groq.com](https://console.groq.com/keys))
-
-### Deploy Steps
-
-1. **Push to GitHub** (already done)
-   ```bash
-   git push origin master
-   ```
-
-2. **Import to Vercel**
-   - Go to [vercel.com/new](https://vercel.com/new)
-   - Select your GitHub repository: `0xnomy/neurometric`
-   - Framework Preset: **Next.js** (auto-detected)
-
-3. **Configure Environment Variables**
-   - Add `GROQ_API_KEY` in Vercel dashboard → Settings → Environment Variables
-   - Value: Your Groq API key
-
-4. **Deploy**
-   - Click "Deploy"
-   - Wait 2-3 minutes for build completion
-
-5. **Verify**
-   - Visit your deployment URL
-   - Test queries in the chat interface
-   - Check SQL workspace loads parquet files
-
-### Size Verification
-Current public folder: **8.38 MB** ✅ (well under Vercel's 45MB limit)
-
-### CLI Deployment (Alternative)
-```bash
-npm install -g vercel
-vercel --prod
-```
-
 ## Dataset Citation
 
 > Zyma I, Tukaev S, Seleznov I, Kiyono K, Popov A, Chernykh M, Shpenkov O. Electroencephalograms during Mental Arithmetic Task Performance. Data. 2019; 4(1):14. https://doi.org/10.3390/data4010014
