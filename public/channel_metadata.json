@@ -1,0 +1,85 @@
+{
+  "channels": [
+    "Fp1",
+    "Fp2",
+    "F3",
+    "F4",
+    "F7",
+    "F8",
+    "T3",
+    "T4",
+    "C3",
+    "C4",
+    "T5",
+    "T6",
+    "P3",
+    "P4",
+    "O1",
+    "O2",
+    "Fz",
+    "Cz",
+    "Pz"
+  ],
+  "sampling_rate": 250,
+  "window_size_sec": 2.0,
+  "overlap": 0.5,
+  "montage": "International 10/20",
+  "reference": "Linked-ear",
+  "filters": {
+    "highpass": "30 Hz",
+    "notch": "50 Hz"
+  },
+  "bands": {
+    "delta": [
+      0.5,
+      4
+    ],
+    "theta": [
+      4,
+      8
+    ],
+    "alpha": [
+      8,
+      13
+    ],
+    "beta": [
+      13,
+      30
+    ],
+    "gamma": [
+      30,
+      50
+    ]
+  },
+  "channel_locations": {
+    "frontal": [
+      "Fp1",
+      "Fp2",
+      "F3",
+      "F4",
+      "F7",
+      "F8",
+      "Fz"
+    ],
+    "central": [
+      "C3",
+      "C4",
+      "Cz"
+    ],
+    "temporal": [
+      "T3",
+      "T4",
+      "T5",
+      "T6"
+    ],
+    "parietal": [
+      "P3",
+      "P4",
+      "Pz"
+    ],
+    "occipital": [
+      "O1",
+      "O2"
+    ]
+  }
+}
