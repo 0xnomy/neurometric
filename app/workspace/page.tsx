@@ -46,6 +46,7 @@ export default function Workspace() {
     const [activeTab, setActiveTab] = useState<'table' | 'raw' | 'brain' | 'topomap' | 'clusters'>('table');
     const [showMethodology, setShowMethodology] = useState(false);
     const [selectedWindowIndex, setSelectedWindowIndex] = useState<number>(0);
+    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -58,14 +59,14 @@ export default function Workspace() {
             try {
                 // Detect mobile device
                 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
-                
+
                 setLoadingStep(isMobile ? 'Loading (Mobile)...' : 'Booting DuckDB-Wasm...');
-                
+
                 // Add delay on mobile to prevent overwhelming the device
                 if (isMobile) {
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
-                
+
                 const database = await initDuckDB();
                 if (!active) return;
 
@@ -85,7 +86,7 @@ export default function Workspace() {
 
                 // Load tables one at a time on mobile for better memory management
                 await connection.query(`LOAD httpfs;`);
-                
+
                 if (isMobile) {
                     await connection.query(`CREATE TABLE features AS SELECT * FROM read_parquet('${baseUrl}/eeg_features.parquet');`);
                     await new Promise(resolve => setTimeout(resolve, 300));
@@ -205,8 +206,6 @@ export default function Workspace() {
             </div>
         );
     }
-
-    const [sidebarOpen, setSidebarOpen] = useState(false);
 
     return (
         <div className="h-screen bg-slate-950 text-slate-200 flex overflow-hidden">
