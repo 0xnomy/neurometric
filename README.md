@@ -6,8 +6,6 @@ NeuroMetric is a Next.js-based "Static Lakehouse" that performs real-time analys
 
 It is enhanced by an **Agentic interface** powered by Llama 3 and Groq, capable of writing its own SQL to answer natural language questions (e.g., *"Which subjects showed the highest frontal beta power?"*).
 
-![NeuroMetric Dashboard](https://github.com/0xnomy/neurometric/raw/main/public/dashboard-preview.png)
-
 ## 🚀 Key Features
 
 *   **Client-Side Lakehouse**: Full SQL processing in the browser using DuckDB-Wasm. Parquet files are cached locally for sub-millisecond query performance.
