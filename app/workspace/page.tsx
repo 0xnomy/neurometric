@@ -434,13 +434,13 @@ export default function Workspace() {
                                                         </div>
                                                     )}
 
-                                                    {activeTab === 'clusters' && (
+                                                    {activeTab === 'clusters' && msg.data && (
                                                         <div className="h-[400px]">
                                                             <ClusterMap
                                                                 data={msg.data}
                                                                 onPointSelect={(point) => {
-                                                                    const idx = msg.data.indexOf(point);
-                                                                    if (idx !== -1) {
+                                                                    const idx = msg.data?.indexOf(point);
+                                                                    if (idx !== undefined && idx !== -1) {
                                                                         setSelectedWindowIndex(idx);
                                                                         // Optional: switch to Brain view to see it? 
                                                                         // Or just stay here. Maybe stay here is better for exploration.
