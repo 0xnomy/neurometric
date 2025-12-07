@@ -70,7 +70,7 @@ function Electrode({ position, value, rawValue, name, setHovered }: { position: 
             const baseScale = 0.08 + (value * 0.1);
             const scale = isHovered ? baseScale * 1.5 : baseScale;
             meshRef.current.scale.setScalar(scale);
-            
+
             // Intensity also correlates with normalized value
             const material = meshRef.current.material as THREE.MeshStandardMaterial;
             if (material) {
@@ -92,13 +92,14 @@ function Electrode({ position, value, rawValue, name, setHovered }: { position: 
         else if (name.startsWith('P')) desc = REGION_DESCRIPTIONS['P'];
         else if (name.startsWith('O')) desc = REGION_DESCRIPTIONS['O'];
 
-        // Smart formatting for small numbers
-        let valStr = rawValue.toFixed(3);
-        if (Math.abs(rawValue) < 0.01 && rawValue !== 0) {
-            valStr = rawValue.toExponential(2);
+        // Smart formatting for small numbers with null safety
+        const safeRawValue = rawValue ?? 0;
+        let valStr = safeRawValue.toFixed(3);
+        if (Math.abs(safeRawValue) < 0.01 && safeRawValue !== 0) {
+            valStr = safeRawValue.toExponential(2);
         }
 
-        setHovered(`Channel ${name} | Value: ${valStr} | ${desc}`);
+        setHovered(`${name}: ${valStr} | ${desc}`);
     };
 
     return (
@@ -109,20 +110,26 @@ function Electrode({ position, value, rawValue, name, setHovered }: { position: 
                 onPointerOut={() => { setIsHovered(false); setHovered(''); }}
             >
                 <sphereGeometry args={[1, 32, 32]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} roughness={0.2} metalness={0.8} />
+                <meshStandardMaterial
+                    color={color}
+                    emissive={color}
+                    emissiveIntensity={0.4}
+                    roughness={0.2}
+                    metalness={0.9}
+                    toneMapped={false}
+                />
             </mesh>
-            {isHovered && (
-                <Html distanceFactor={8}>
-                    <div className="bg-slate-900/95 text-white text-[11px] px-3 py-1.5 rounded-lg border border-indigo-500 shadow-lg z-50 pointer-events-none">
-                        <div className="font-bold text-indigo-300">{name}</div>
-                        <div className="text-[10px] text-slate-300 mt-0.5">
-                            Value: <span className="text-yellow-400 font-mono">{rawValue.toFixed(3)}</span>
-                        </div>
-                        <div className="text-[9px] text-slate-400 mt-0.5">
-                            Intensity: {(value * 100).toFixed(0)}%
-                        </div>
-                    </div>
-                </Html>
+            {/* Glow effect for high activity */}
+            {value > 0.6 && (
+                <mesh scale={[1.08, 1.08, 1.08]}>
+                    <sphereGeometry args={[1, 16, 16]} />
+                    <meshBasicMaterial
+                        color={color}
+                        transparent
+                        opacity={0.25 * (value - 0.6)}
+                        side={THREE.BackSide}
+                    />
+                </mesh>
             )}
         </group>
     );
@@ -130,13 +137,13 @@ function Electrode({ position, value, rawValue, name, setHovered }: { position: 
 
 function BrainModel() {
     return (
-        <mesh scale={[1, 0.8, 1.2]}>
-            <sphereGeometry args={[0.95, 32, 32]} />
+        <mesh scale={[0.9, 0.75, 1.05]}>
+            <sphereGeometry args={[0.95, 24, 24]} />
             <meshStandardMaterial
-                color="#303040"
+                color="#475569"
                 wireframe={true}
                 transparent={true}
-                opacity={0.05}
+                opacity={0.04}
             />
         </mesh>
     );
@@ -154,8 +161,8 @@ function BrainConnections() {
                     <Line
                         key={i}
                         points={[startPos, endPos]}
-                        color="white"
-                        opacity={0.3}
+                        color="#475569"
+                        opacity={0.12}
                         transparent
                         lineWidth={1}
                     />
@@ -184,37 +191,50 @@ export default function ThreeBrain({ data, metricLabel }: ThreeBrainProps) {
         return norm;
     }, [data]);
 
+    // Check if we have actual data
+    const hasData = data && Object.keys(data).length > 0 && Object.values(data).some(v => v !== 0);
+
     return (
-        <div className="w-full h-full min-h-[400px] relative bg-slate-950 rounded-xl overflow-hidden shadow-2xl border border-slate-800 flex">
+        <div className="w-full h-full min-h-[400px] relative bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 rounded-xl overflow-hidden shadow-2xl border border-slate-800/50 flex">
             {/* 3D Canvas */}
             <div className="flex-1 relative">
                 <div className="absolute top-4 left-4 z-10 pointer-events-none">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                    <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-pulse shadow-lg shadow-indigo-500/50" />
                         Live Cortex
                     </h3>
-                    <p className="text-xs text-slate-400 font-mono">
-                        {metricLabel || 'Interactive 3D View'}
+                    <p className="text-xs text-slate-400 font-mono mt-1">
+                        {hasData ? (metricLabel || 'EEG Channel Activity') : 'Awaiting query data...'}
                     </p>
                 </div>
 
                 {/* Information Overlay */}
-                <div className="absolute bottom-4 left-4 z-10 pointer-events-none">
-                    <p className="text-sm text-indigo-300 font-semibold h-6">
-                        {hoverInfo}
-                    </p>
-                </div>
+                {hoverInfo && (
+                    <div className="absolute bottom-4 left-4 z-10 pointer-events-none max-w-md">
+                        <div className="bg-slate-900/90 backdrop-blur-md rounded-lg px-3 py-2 border border-indigo-500/30 shadow-lg">
+                            <p className="text-xs text-indigo-300 font-semibold">
+                                {hoverInfo}
+                            </p>
+                        </div>
+                    </div>
+                )}
 
-                <div className="absolute top-4 right-4 z-10 pointer-events-none flex flex-col gap-1 items-end">
-                    <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                        Low <div className="w-20 h-2 bg-gradient-to-r from-blue-600 via-green-500 to-red-600 rounded-full"></div> High
+                <div className="absolute top-4 right-4 z-10 pointer-events-none flex flex-col gap-2 items-end">
+                    <div className="bg-slate-900/80 backdrop-blur-sm rounded-lg px-2 py-1.5 border border-slate-700/50">
+                        <div className="flex items-center gap-2 text-[10px] text-slate-300 font-medium">
+                            <span className="text-blue-400">Low</span>
+                            <div className="w-24 h-2.5 bg-gradient-to-r from-blue-600 via-green-500 to-red-600 rounded-full shadow-inner"></div>
+                            <span className="text-red-400">High</span>
+                        </div>
                     </div>
                 </div>
 
-                <Canvas camera={{ position: [0, 2, 2.5], fov: 45 }}>
-                    <ambientLight intensity={0.5} />
-                    <pointLight position={[10, 10, 10]} intensity={1} />
-                    <pointLight position={[-10, -5, -10]} color="blue" intensity={0.5} />
+                <Canvas camera={{ position: [0, 2.2, 3], fov: 50 }} gl={{ antialias: true, alpha: true, toneMapping: THREE.ACESFilmicToneMapping }}>
+                    <ambientLight intensity={0.4} />
+                    <pointLight position={[10, 10, 10]} intensity={1.5} color="#ffffff" castShadow />
+                    <pointLight position={[-10, -5, -10]} color="#6366f1" intensity={1} />
+                    <pointLight position={[0, -10, 5]} color="#8b5cf6" intensity={0.6} />
+                    <spotLight position={[0, 15, 0]} angle={0.3} intensity={0.5} color="#a78bfa" />
 
                     <group rotation={[0, -Math.PI / 2, 0]}>
                         <BrainModel />
@@ -225,7 +245,7 @@ export default function ThreeBrain({ data, metricLabel }: ThreeBrainProps) {
                                 position={coords}
                                 name={name}
                                 value={normalizedData[name] ?? 0}
-                                rawValue={data ? data[name] : 0}
+                                rawValue={data?.[name] ?? 0}
                                 setHovered={setHoverInfo}
                             />
                         ))}

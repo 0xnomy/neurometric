@@ -83,6 +83,13 @@ The system operates on a unique "Pre-baked" architecture:
 *   *"How does frontal beta power in subject s04 compare to occipital alpha?"* (Visualization: Multi-channel)
 *   *"Explain the role of the Fz electrode."* (Agentic Chat)
 
+**Log Storage**:
+- Queries stored in `logs/query-logs.jsonl` (JSONL format)
+- Includes: query text, timestamp, IP, country, city, user agent, success status
+- Automatically created on first query (excluded from git via `.gitignore`)
+
+Access the admin dashboard: `https://your-domain.com/admin`
+
 ## Dataset Citation
 
 > Zyma I, Tukaev S, Seleznov I, Kiyono K, Popov A, Chernykh M, Shpenkov O. Electroencephalograms during Mental Arithmetic Task Performance. Data. 2019; 4(1):14. https://doi.org/10.3390/data4010014

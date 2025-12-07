@@ -419,7 +419,7 @@ export default function Workspace() {
 
                                                     {activeTab === 'brain' && (
                                                         <div className="h-[400px] relative">
-                                                            <ThreeBrain data={parseChannelData([msg.data?.[selectedWindowIndex] || msg.data?.[0] || {}])} />
+                                                            <ThreeBrain data={parseChannelData(msg.data || [])} metricLabel={msg.data && msg.data.length > 0 ? `${Object.keys(msg.data[0]).find(k => k !== 'channel' && k !== 'subject') || 'Activity'}` : undefined} />
                                                             {msg.data && msg.data.length > 1 && (
                                                                 <div className="absolute bottom-2 left-2 bg-black/50 p-1 text-[10px] rounded text-white font-mono">
                                                                     Window: {selectedWindowIndex} / {msg.data.length - 1}
@@ -430,7 +430,7 @@ export default function Workspace() {
 
                                                     {activeTab === 'topomap' && (
                                                         <div className="h-[400px] relative">
-                                                            <Topomap data={parseChannelData([msg.data?.[selectedWindowIndex] || msg.data?.[0] || {}])} />
+                                                            <Topomap data={parseChannelData(msg.data || [])} />
                                                         </div>
                                                     )}
 

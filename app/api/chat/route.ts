@@ -5,6 +5,19 @@ const groq = new Groq({
     apiKey: process.env.GROQ_API_KEY || '',
 });
 
+// Helper function to log queries
+async function logQuery(query: string, stage: string, response: any, error: any = null, req: NextRequest) {
+    try {
+        await fetch(`${req.nextUrl.origin}/api/log`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query, stage, response, error })
+        });
+    } catch (err) {
+        console.error('Failed to log query:', err);
+    }
+}
+
 export async function POST(req: NextRequest) {
     try {
         const { query, stage, sqlResults, schema } = await req.json();
@@ -47,7 +60,12 @@ ALWAYS return JSON with "sql" and "thought" keys.`;
             });
 
             const content = completion.choices[0]?.message?.content || '{}';
-            return NextResponse.json(JSON.parse(content));
+            const result = JSON.parse(content);
+
+            // Log the query (non-blocking)
+            logQuery(query, stage, result, null, req);
+
+            return NextResponse.json(result);
         }
 
         if (stage === 'insight') {
@@ -90,12 +108,17 @@ RESPONSE STYLE:
                     { role: 'user', content: `Query: ${query}\nSQL Results: ${JSON.stringify(sqlResults)}` }
                 ],
                 model: 'llama-3.3-70b-versatile',
-                temperature: 0.5,
+                temperature: 0.5
             });
 
-            return NextResponse.json({
+            const result = {
                 insight: completion.choices[0]?.message?.content
-            });
+            };
+
+            // Log the insight generation (non-blocking)
+            logQuery(query, stage, result, null, req);
+
+            return NextResponse.json(result);
         }
 
         return NextResponse.json({ error: 'Invalid stage' }, { status: 400 });

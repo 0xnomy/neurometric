@@ -42,6 +42,11 @@ htmlcov/
 .env.test.local
 .env.production.local
 
+# Analytics & Logs
+logs/
+*.log
+*.jsonl
+
 # IDEs
 .vscode/
 .idea/

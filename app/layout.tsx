@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Inter, Outfit } from 'next/font/google';
 import './globals.css';
 import { clsx } from 'clsx';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const outfit = Outfit({ subsets: ['latin'], variable: '--font-outfit' });
@@ -20,6 +22,8 @@ export default function RootLayout({
     <html lang="en" className="dark">
       <body className={clsx(inter.variable, outfit.variable, "bg-slate-950 text-slate-100 font-sans antialiased selection:bg-indigo-500/30")}>
         {children}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );
