@@ -19,13 +19,18 @@ export default function ClusterMap({ data, onPointSelect }: ClusterMapProps) {
     const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
     const resetZoomRef = useRef<() => void>(() => { });
 
-    // Filter valid points only
-    const points = useMemo(() => data.filter(d =>
-        typeof d.pca_x === 'number' &&
-        typeof d.pca_y === 'number' &&
-        !isNaN(d.pca_x) &&
-        !isNaN(d.pca_y)
-    ), [data]);
+    // Filter valid points only (ensure pca_x and pca_y exist)
+    const points = useMemo(() => {
+        if (!data || data.length === 0) return [];
+        return data.filter(d =>
+            d.pca_x !== undefined && d.pca_x !== null &&
+            d.pca_y !== undefined && d.pca_y !== null &&
+            typeof d.pca_x === 'number' &&
+            typeof d.pca_y === 'number' &&
+            !isNaN(d.pca_x) &&
+            !isNaN(d.pca_y)
+        );
+    }, [data]);
 
     // Calculate Cluster Stats
     const clusterStats = useMemo(() => {
@@ -183,6 +188,22 @@ export default function ClusterMap({ data, onPointSelect }: ClusterMapProps) {
     const colorScale = d3.scaleOrdinal()
         .domain(['0', '1', '2', '3'])
         .range(['#10b981', '#6366f1', '#f59e0b', '#ec4899']);
+
+    // Show empty state if no valid data
+    if (points.length === 0) {
+        return (
+            <div className="w-full h-full flex items-center justify-center bg-slate-900/50 border border-slate-800 rounded-lg">
+                <div className="text-center p-8">
+                    <Brain className="w-12 h-12 text-slate-600 mx-auto mb-4" />
+                    <div className="text-slate-400 text-sm font-semibold mb-2">No Cluster Data Available</div>
+                    <div className="text-slate-500 text-xs max-w-md">
+                        To see cognitive state clusters, try querying for full features:<br />
+                        <span className="text-indigo-400 font-mono mt-2 block">&ldquo;Show all features for subject s01&rdquo;</span>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full h-full flex gap-4">

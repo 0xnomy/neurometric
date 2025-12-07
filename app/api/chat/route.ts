@@ -23,9 +23,12 @@ DATASET SCHEMA:
 - features table:
   - subject (string), channel (string), window_idx (int), window_start (float), window_end (float)
   - alpha_power, beta_power, theta_power, delta_power, gamma_power (floats)
+  - spectral_entropy, dfa_alpha, mean_val, var_val, skewness, kurtosis, energy (floats)
+  - cluster_id (int), pca_x (float), pca_y (float) - for cognitive state clustering
 - Limit to 100 rows unless specified
 - For channel comparisons: GROUP BY channel
 - For subject analysis: GROUP BY subject or filter WHERE subject='sXX'
+- For cluster analysis: SELECT * FROM features WHERE cluster_id IS NOT NULL LIMIT 500
 
 Example queries:
 - "Highest beta channel" → SELECT channel, AVG(beta_power) as avg_beta FROM features GROUP BY channel ORDER BY avg_beta DESC LIMIT 5

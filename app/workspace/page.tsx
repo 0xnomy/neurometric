@@ -435,7 +435,7 @@ export default function Workspace() {
                                                     )}
 
                                                     {activeTab === 'clusters' && msg.data && (
-                                                        <div className="h-[400px]">
+                                                        <div className="h-full min-h-[400px] w-full p-4">
                                                             <ClusterMap
                                                                 data={msg.data}
                                                                 onPointSelect={(point) => {
@@ -514,9 +514,11 @@ function parseChannelData(data: Record<string, unknown>[]): Record<string, numbe
     // e.g. [{channel: 'Fp1', alpha: 0.5}, ...]
     if ('channel' in data[0]) {
         const result: Record<string, number> = {};
-        // Find the first numerical key that isn't 'channel' or 'subject' or 'window_idx'
+        // Find the first numerical key that isn't metadata
         const valueKey = Object.keys(data[0]).find(k =>
-            k !== 'channel' && k !== 'subject' && k !== 'window_idx' && (typeof data[0][k] === 'number' || typeof data[0][k] === 'bigint')
+            k !== 'channel' && k !== 'subject' && k !== 'window_idx' && k !== 'window_start' && k !== 'window_end'
+            && k !== 'cluster_id' && k !== 'pca_x' && k !== 'pca_y'
+            && (typeof data[0][k] === 'number' || typeof data[0][k] === 'bigint')
         );
 
         if (valueKey) {

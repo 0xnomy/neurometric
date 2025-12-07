@@ -86,12 +86,12 @@ function Electrode({ position, value, rawValue, name, setHovered }: { position: 
         else if (name.startsWith('O')) desc = REGION_DESCRIPTIONS['O'];
 
         // Smart formatting for small numbers
-        let valStr = rawValue.toFixed(2);
+        let valStr = rawValue.toFixed(3);
         if (Math.abs(rawValue) < 0.01 && rawValue !== 0) {
             valStr = rawValue.toExponential(2);
         }
 
-        setHovered(`${name}: ${valStr} (${desc})`);
+        setHovered(`Channel ${name} | Value: ${valStr} | ${desc}`);
     };
 
     return (
