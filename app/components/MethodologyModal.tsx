@@ -100,6 +100,26 @@ export default function MethodologyModal({ isOpen, onClose }: MethodologyModalPr
                                     </div>
                                 </div>
                             </section>
+
+                            <section>
+                                <div className="flex items-center gap-2 mb-3 text-amber-400 text-sm font-bold uppercase tracking-wider">
+                                    <Database className="w-4 h-4" /> Vector Store & RAG
+                                </div>
+                                <div className="space-y-3">
+                                    <div className="flex gap-4 items-start">
+                                        <div className="font-mono text-xs text-slate-500 min-w-[80px]">Index</div>
+                                        <div className="text-sm text-slate-300">
+                                            <strong>FAISS:</strong> Using <code>IndexFlatL2</code> (Euclidean Distance). It stores 10,000+ vectors generated from EEG features + metadata narratives.
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-4 items-start">
+                                        <div className="font-mono text-xs text-slate-500 min-w-[80px]">Embeddings</div>
+                                        <div className="text-sm text-slate-300">
+                                            <strong>all-MiniLM-L6-v2:</strong> A 384-dimensional sentence transformer model used to encode text descriptions of channel activity (e.g., "Subject s00 channel Fp1 alpha 0.5...").
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     </motion.div>
                 </motion.div>

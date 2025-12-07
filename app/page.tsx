@@ -31,11 +31,12 @@ export default function LandingPage() {
             </span>
           </div>
           <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
+            <Link href="/about" className="hover:text-white transition-colors">About</Link>
+            <a href="#features" className="hover:text-white transition-colors">Features</a>
+            <button onClick={() => setShowDocumentation(true)} className="hover:text-white transition-colors">Methodology</button>
             <Link href="/upload" className="flex items-center gap-2 hover:text-white transition-colors">
               <Upload className="w-4 h-4" /> Upload Data
             </Link>
-            <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <button onClick={() => setShowDocumentation(true)} className="hover:text-white transition-colors">Methodology</button>
             <a href="https://github.com/0xnomy/neurometric" target="_blank" className="flex items-center gap-2 hover:text-white transition-colors">
               <Github className="w-4 h-4" /> GitHub
             </a>
@@ -69,12 +70,12 @@ export default function LandingPage() {
               <Zap className="w-5 h-5" />
               Start Analysis
             </Link>
-            <button
-              onClick={() => setShowDocumentation(true)}
+            <Link
+              href="/about"
               className="w-full sm:w-auto px-8 py-4 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-semibold transition-all border border-slate-700"
             >
-              View Documentation
-            </button>
+              About Project
+            </Link>
           </div>
 
           {/* Stats / Tech Stack */}

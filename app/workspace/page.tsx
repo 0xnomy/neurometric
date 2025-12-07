@@ -2,39 +2,23 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Activity, Terminal, Loader2, ChevronRight, Brain, Table2 } from 'lucide-react';
+import { Send, Activity, Terminal, Loader2, ChevronRight, Brain, Table2, Home, Github, FileText, ExternalLink, Sparkles, Filter } from 'lucide-react';
 import * as duckdb from '@duckdb/duckdb-wasm';
+import { initDuckDB, DuckDBConnection } from '../../lib/duckdb';
 import MethodologyModal from '../components/MethodologyModal';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import Link from 'next/link';
-import { Home, Github, FileText, ExternalLink } from 'lucide-react';
 import dynamic from 'next/dynamic';
 
 const ThreeBrain = dynamic(() => import('../components/ThreeBrain'), { ssr: false });
 const Topomap = dynamic(() => import('../components/Topomap'), { ssr: false });
+const ClusterMap = dynamic(() => import('../components/ClusterMap'), { ssr: false });
 
 // ==========================================
 // DuckDB Init Helper with Extension Bundling
 // ==========================================
-async function initDuckDB() {
-    const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
-    const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
-
-    const worker_url = URL.createObjectURL(
-        new Blob([`importScripts("${bundle.mainWorker!}");`], { type: 'text/javascript' })
-    );
-
-    const worker = new Worker(worker_url);
-    const logger = new duckdb.ConsoleLogger();
-    const db = new duckdb.AsyncDuckDB(logger, worker);
-
-    // Instantiate with extensions pre-bundled
-    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-
-    URL.revokeObjectURL(worker_url);
-    return db;
-}
+// Helper removed (imported from lib)
 
 // ==========================================
 // Types
@@ -56,31 +40,35 @@ export default function Workspace() {
     const [isReady, setIsReady] = useState(false);
     const [loadingStep, setLoadingStep] = useState('Initializing Engine...');
 
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: 'init',
-            role: 'assistant',
-            content: '### **EEG Cognitive Workload Lakehouse Ready**\n\nI specialize in analyzing your 36-subject mental arithmetic EEG dataset (s00–s35).\n\n**Available Tables:**\n- `features` - 84k windowed features (alpha/beta/theta/delta/gamma, DFA, entropy)\n- `subjects` - Subject-level statistics\n\n**Channels:** Fp1, Fp2, F3, F4, F7, F8, T3, T4, C3, C4, T5, T6, P3, P4, O1, O2, Fz, Cz, Pz\n\n**Ask me:**\n- Statistical queries (I\'ll generate SQL)\n- Neuroscience interpretations (no SQL needed)\n- Channel roles and cognitive workload patterns\n',
-            timestamp: Date.now()
-        }
-    ]);
+    const [messages, setMessages] = useState<Message[]>([]);
     const [input, setInput] = useState('');
     const [processing, setProcessing] = useState(false);
-    const [activeTab, setActiveTab] = useState<'table' | 'raw' | 'brain' | 'topomap'>('table');
+    const [activeTab, setActiveTab] = useState<'table' | 'raw' | 'brain' | 'topomap' | 'clusters'>('table');
     const [showMethodology, setShowMethodology] = useState(false);
+    const [selectedWindowIndex, setSelectedWindowIndex] = useState<number>(0);
 
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     // Initialize DB on Mount
     useEffect(() => {
+        let active = true;
+        let dbInstance: duckdb.AsyncDuckDB | null = null;
+
         const startDB = async () => {
             try {
                 setLoadingStep('Booting DuckDB-Wasm...');
                 const database = await initDuckDB();
+                if (!active) return;
+
+                dbInstance = database;
                 setDb(database);
 
                 setLoadingStep('Connecting...');
                 const connection = await database.connect();
+                if (!active) {
+                    await connection.close();
+                    return;
+                }
                 setConn(connection);
 
                 setLoadingStep('Mounting Parquet Tables...');
@@ -94,15 +82,27 @@ export default function Workspace() {
           CREATE TABLE subjects AS SELECT * FROM read_parquet('${baseUrl}/eeg_subjects.parquet');
         `);
 
-                setLoadingStep('Ready');
-                setIsReady(true);
+                if (active) {
+                    setLoadingStep('Ready');
+                    setIsReady(true);
+                }
             } catch (e) {
                 console.error(e);
-                setLoadingStep('Error: ' + String(e));
+                if (active) setLoadingStep('Error: ' + String(e));
             }
         };
 
         startDB();
+
+        return () => {
+            active = false;
+            if (conn) {
+                conn.close().catch(console.error);
+            }
+            if (dbInstance) {
+                dbInstance.terminate().catch(console.error);
+            }
+        };
     }, []);
 
     useEffect(() => {
@@ -110,10 +110,10 @@ export default function Workspace() {
     }, [messages]);
 
     // Handle Query
-    const handleSend = async () => {
-        if (!input.trim() || processing || !conn) return;
+    const handleSend = async (overrideInput?: string) => {
+        const userQuery = overrideInput || input;
+        if (!userQuery.trim() || processing || !conn) return;
 
-        const userQuery = input;
         setInput('');
         setProcessing(true);
 
@@ -140,7 +140,23 @@ export default function Workspace() {
             if (plan.sql) {
                 try {
                     const arrowResult = await conn.query(plan.sql);
-                    const resultData = arrowResult.toArray().map((row: unknown) => (row as { toJSON: () => Record<string, unknown> }).toJSON());
+
+                    // Convert Arrow Table to JSON and handle BigInts early
+                    const resultData = arrowResult.toArray().map((row: unknown) => {
+                        const jsonRow = (row as { toJSON: () => Record<string, unknown> }).toJSON();
+                        // Pre-process BigInts to Strings/Numbers for cleaner consumption
+                        const processedRow: Record<string, unknown> = {};
+                        Object.entries(jsonRow).forEach(([k, v]) => {
+                            if (typeof v === 'bigint') {
+                                // Convert to number if safe, else string
+                                processedRow[k] = v <= Number.MAX_SAFE_INTEGER ? Number(v) : v.toString();
+                            } else {
+                                processedRow[k] = v;
+                            }
+                        });
+                        return processedRow;
+                    });
+
                     assistantMsg.data = resultData;
 
                     // 3. Insight Agent
@@ -186,7 +202,7 @@ export default function Workspace() {
                 <div className="flex-1 overflow-y-auto">
                     <div className="text-xs font-semibold text-slate-500 mb-2 uppercase tracking-wider">Lakehouse Schema</div>
                     <div className="space-y-2">
-                        <SchemaTable name="features" cols={['subject', 'channel', 'window_idx', 'alpha_power', 'beta_power']} />
+                        <SchemaTable name="features" cols={['subject', 'channel', 'window_idx', 'alpha_power', 'beta_power', 'cluster_id', 'pca_x', 'pca_y']} />
                         <SchemaTable name="subjects" cols={['subject', 'n_windows', 'avg_entropy']} />
                     </div>
                 </div>
@@ -232,162 +248,223 @@ export default function Workspace() {
 
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                    {messages.map((msg) => (
-                        <motion.div
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            key={msg.id}
-                            className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                            <div className={`max-w-3xl rounded-2xl p-5 ${msg.role === 'user'
-                                ? 'bg-indigo-600 text-white'
-                                : 'bg-slate-900 border border-slate-800'
-                                }`}>
-                                {msg.role === 'assistant' && (
-                                    <div className="flex items-center gap-2 mb-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
-                                        <Brain className="w-3 h-3" /> Agent Response
+                    <AnimatePresence mode="popLayout">
+                        {messages.length === 0 ? (
+                            <motion.div
+                                initial={{ opacity: 0, y: 20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                transition={{ duration: 0.5 }}
+                                className="h-full flex flex-col items-center justify-center p-8 text-center space-y-8"
+                            >
+                                <div className="space-y-4 max-w-2xl">
+                                    <div className="w-20 h-20 bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 ring-1 ring-indigo-500/30">
+                                        <Brain className="w-10 h-10 text-indigo-400" />
                                     </div>
-                                )}
-
-                                <div className="prose prose-invert prose-sm max-w-none">
-                                    <ReactMarkdown
-                                        remarkPlugins={[remarkGfm]}
-                                        components={{
-                                            h1: ({ ...props }) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
-                                            h2: ({ ...props }) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
-                                            h3: ({ ...props }) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
-                                            h4: ({ ...props }) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
-                                            p: ({ ...props }) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
-                                            ul: ({ ...props }) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                            ol: ({ ...props }) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                            li: ({ ...props }) => <li className="text-slate-300" {...props} />,
-                                            strong: ({ ...props }) => <strong className="font-bold text-white" {...props} />,
-                                            em: ({ ...props }) => <em className="italic text-slate-200" {...props} />,
-                                        }}
-                                    >
-                                        {msg.content}
-                                    </ReactMarkdown>
+                                    <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 pb-2">
+                                        NeuroMetric Engine
+                                    </h1>
+                                    <p className="text-lg text-slate-400 leading-relaxed">
+                                        Your cognitive workload lakehouse is ready. I can analyze alpha/beta power,
+                                        entropy patterns, and subject statistics from your 36-subject dataset.
+                                    </p>
                                 </div>
 
-                                {msg.sql && (
-                                    <div className="mt-4 bg-slate-950 rounded-lg p-3 font-mono text-xs text-emerald-400 overflow-x-auto border border-slate-800">
-                                        <div className="flex items-center gap-2 mb-1 text-slate-500 select-none">
-                                            <Terminal className="w-3 h-3" /> Execute SQL
-                                        </div>
-                                        {msg.sql}
-                                    </div>
-                                )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl">
+                                    {[
+                                        { label: "Alpha Power Distribution", query: "Show me the distribution of alpha power across all subjects" },
+                                        { label: "Frontal vs Occipital", query: "Compare average beta power between Frontal (F3, F4) and Occipital (O1, O2) channels" },
+                                        { label: "High Entropy Subjects", query: "List the top 5 subjects with the highest spectral entropy" },
+                                        { label: "Workload Analysis", query: "Analyze the cognitive workload for subject s01 based on theta/alpha ratio" }
+                                    ].map((item, i) => (
+                                        <button
+                                            key={i}
+                                            onClick={() => handleSend(item.query)}
+                                            className="group flex flex-col items-start p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-xl transition-all duration-200 text-left"
+                                        >
+                                            <span className="text-sm font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">
+                                                {item.label}
+                                            </span>
+                                            <span className="text-xs text-slate-500 mt-1 line-clamp-1">
+                                                {item.query}
+                                            </span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </motion.div>
+                        ) : (
+                            messages.map((msg) => (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 10 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    key={msg.id}
+                                    className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                >
+                                    <div className={`max-w-3xl rounded-2xl p-5 ${msg.role === 'user'
+                                        ? 'bg-indigo-600 text-white'
+                                        : 'bg-slate-900 border border-slate-800'
+                                        }`}>
+                                        {msg.role === 'assistant' && (
+                                            <div className="flex items-center gap-2 mb-2 text-indigo-400 text-xs font-bold uppercase tracking-wider">
+                                                <Brain className="w-3 h-3" /> Agent Response
+                                            </div>
+                                        )}
 
-                                {msg.insight && (
-                                    <div className="mt-4 pt-4 border-t border-slate-800 animate-fade-in">
-                                        <div className="flex items-center gap-2 mb-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
-                                            <Activity className="w-3 h-3" /> Cognitive Insight
-                                        </div>
                                         <div className="prose prose-invert prose-sm max-w-none">
                                             <ReactMarkdown
                                                 remarkPlugins={[remarkGfm]}
                                                 components={{
-                                                    h1: ({ ...props }) => <h1 className="text-lg font-bold text-white mb-2 mt-4" {...props} />,
-                                                    h2: ({ ...props }) => <h2 className="text-base font-bold text-white mb-2 mt-3" {...props} />,
-                                                    h3: ({ ...props }) => <h3 className="text-sm font-bold text-indigo-300 mb-1 mt-2" {...props} />,
-                                                    h4: ({ ...props }) => <h4 className="text-sm font-semibold text-slate-300 mb-1 mt-2" {...props} />,
-                                                    p: ({ ...props }) => <p className="text-slate-300 leading-relaxed mb-3" {...props} />,
-                                                    ul: ({ ...props }) => <ul className="list-disc pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                                    ol: ({ ...props }) => <ol className="list-decimal pl-5 mb-3 space-y-1 text-slate-300" {...props} />,
-                                                    li: ({ ...props }) => <li className="text-slate-300" {...props} />,
-                                                    strong: ({ ...props }) => <strong className="font-bold text-white" {...props} />,
-                                                    em: ({ ...props }) => <em className="italic text-slate-200" {...props} />,
+                                                    table: ({ node, ...props }) => <div className="overflow-x-auto my-4 border border-slate-700 rounded-lg"><table className="w-full text-sm text-left text-slate-400 bg-slate-900" {...props} /></div>,
+                                                    th: ({ node, ...props }) => <th className="px-4 py-2 bg-slate-800 text-slate-200 font-semibold border-b border-slate-700" {...props} />,
+                                                    td: ({ node, ...props }) => <td className="px-4 py-2 border-b border-slate-800/50" {...props} />
                                                 }}
                                             >
-                                                {msg.insight}
+                                                {msg.content}
                                             </ReactMarkdown>
                                         </div>
-                                    </div>
-                                )}
 
-                                {msg.data && msg.data.length > 0 && (
-                                    <div className="mt-4">
-                                        <div className="flex gap-2 mb-2">
-                                            <button
-                                                onClick={() => setActiveTab('table')}
-                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'table' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                Table
-                                            </button>
-                                            <button
-                                                onClick={() => setActiveTab('brain')}
-                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'brain' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                3D Brain
-                                            </button>
-                                            <button
-                                                onClick={() => setActiveTab('topomap')}
-                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'topomap' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                Topomap
-                                            </button>
-                                            <button
-                                                onClick={() => setActiveTab('raw')}
-                                                className={`text-xs px-2 py-1 rounded ${activeTab === 'raw' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
-                                            >
-                                                Raw
-                                            </button>
-                                        </div>
+                                        {msg.sql && (
+                                            <div className="mt-4 bg-slate-950 rounded-lg p-3 font-mono text-xs text-emerald-400 overflow-x-auto border border-slate-800">
+                                                <div className="flex items-center gap-2 mb-1 text-slate-500 select-none">
+                                                    <Terminal className="w-3 h-3" /> Execute SQL
+                                                </div>
+                                                {msg.sql}
+                                            </div>
+                                        )}
 
-                                        <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden min-h-[300px]">
-                                            {activeTab === 'table' && (
-                                                <div className="overflow-x-auto max-h-96 custom-scrollbar">
-                                                    <table className="w-full text-xs text-left">
-                                                        <thead className="bg-slate-900 text-slate-400 sticky top-0">
-                                                            <tr>
-                                                                {Object.keys(msg.data[0]).map(k => (
-                                                                    <th key={k} className="p-2 font-medium">{k}</th>
-                                                                ))}
-                                                            </tr>
-                                                        </thead>
-                                                        <tbody className="divide-y divide-slate-800 text-slate-300">
-                                                            {msg.data.slice(0, 10).map((row: Record<string, unknown>, i: number) => (
-                                                                <tr key={i} className="hover:bg-slate-900/50">
-                                                                    {Object.values(row).map((v: unknown, j) => (
-                                                                        <td key={j} className="p-2 whitespace-nowrap">
-                                                                            {typeof v === 'number' ? (v % 1 !== 0 ? v.toFixed(3) : v) : String(v)}
-                                                                        </td>
+                                        {msg.insight && (
+                                            <div className="mt-4 pt-4 border-t border-slate-800 animate-fade-in">
+                                                <div className="flex items-center gap-2 mb-2 text-amber-400 text-xs font-bold uppercase tracking-wider">
+                                                    <Activity className="w-3 h-3" /> Cognitive Insight
+                                                </div>
+                                                <div className="prose prose-invert prose-sm max-w-none">
+                                                    <ReactMarkdown
+                                                        remarkPlugins={[remarkGfm]}
+                                                        components={{
+                                                            table: ({ node, ...props }) => <div className="overflow-x-auto my-4 border border-slate-700 rounded-lg"><table className="w-full text-sm text-left text-slate-400 bg-slate-900" {...props} /></div>,
+                                                            th: ({ node, ...props }) => <th className="px-4 py-2 bg-slate-800 text-slate-200 font-semibold border-b border-slate-700" {...props} />,
+                                                            td: ({ node, ...props }) => <td className="px-4 py-2 border-b border-slate-800/50" {...props} />
+                                                        }}
+                                                    >
+                                                        {msg.insight}
+                                                    </ReactMarkdown>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {msg.data && msg.data.length > 0 && (
+                                            <div className="mt-4">
+                                                <div className="flex gap-2 mb-2">
+                                                    <button
+                                                        onClick={() => setActiveTab('table')}
+                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'table' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    >
+                                                        Table
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActiveTab('brain')}
+                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'brain' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    >
+                                                        3D Brain
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActiveTab('topomap')}
+                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'topomap' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    >
+                                                        Topomap
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActiveTab('clusters')}
+                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'clusters' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    >
+                                                        <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Clusters</span>
+                                                    </button>
+                                                    <button
+                                                        onClick={() => setActiveTab('raw')}
+                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'raw' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                    >
+                                                        Raw
+                                                    </button>
+                                                </div>
+
+                                                <div className="bg-slate-950 rounded-lg border border-slate-800 overflow-hidden min-h-[300px]">
+                                                    {activeTab === 'table' && (
+                                                        <div className="overflow-x-auto max-h-96 custom-scrollbar">
+                                                            <table className="w-full text-xs text-left">
+                                                                <thead className="bg-slate-900 text-slate-400 sticky top-0">
+                                                                    <tr>
+                                                                        {Object.keys(msg.data[0]).map(k => (
+                                                                            <th key={k} className="p-2 font-medium">{k}</th>
+                                                                        ))}
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody className="divide-y divide-slate-800 text-slate-300">
+                                                                    {msg.data.slice(0, 10).map((row: Record<string, unknown>, i: number) => (
+                                                                        <tr key={i} className="hover:bg-slate-900/50">
+                                                                            {Object.values(row).map((v: unknown, j) => (
+                                                                                <td key={j} className="p-2 whitespace-nowrap">
+                                                                                    {typeof v === 'number' ? (v % 1 !== 0 ? v.toFixed(3) : v) : String(v)}
+                                                                                </td>
+                                                                            ))}
+                                                                        </tr>
                                                                     ))}
-                                                                </tr>
-                                                            ))}
-                                                        </tbody>
-                                                    </table>
-                                                    {msg.data.length > 10 && (
-                                                        <div className="p-2 text-center text-xs text-slate-500 bg-slate-900/50">
-                                                            + {msg.data.length - 10} more rows
+                                                                </tbody>
+                                                            </table>
+                                                            {msg.data.length > 10 && (
+                                                                <div className="p-2 text-center text-xs text-slate-500 bg-slate-900/50">
+                                                                    + {msg.data.length - 10} more rows
+                                                                </div>
+                                                            )}
                                                         </div>
                                                     )}
-                                                </div>
-                                            )}
 
-                                            {activeTab === 'brain' && (
-                                                <div className="h-[400px]">
-                                                    <ThreeBrain data={parseChannelData(msg.data)} />
-                                                </div>
-                                            )}
+                                                    {activeTab === 'brain' && (
+                                                        <div className="h-[400px] relative">
+                                                            <ThreeBrain data={parseChannelData([msg.data?.[selectedWindowIndex] || msg.data?.[0] || {}])} />
+                                                            {msg.data && msg.data.length > 1 && (
+                                                                <div className="absolute bottom-2 left-2 bg-black/50 p-1 text-[10px] rounded text-white font-mono">
+                                                                    Window: {selectedWindowIndex} / {msg.data.length - 1}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
 
-                                            {activeTab === 'topomap' && (
-                                                <div className="h-[400px]">
-                                                    <Topomap data={parseChannelData(msg.data)} />
-                                                </div>
-                                            )}
+                                                    {activeTab === 'topomap' && (
+                                                        <div className="h-[400px] relative">
+                                                            <Topomap data={parseChannelData([msg.data?.[selectedWindowIndex] || msg.data?.[0] || {}])} />
+                                                        </div>
+                                                    )}
 
-                                            {activeTab === 'raw' && (
-                                                <pre className="p-3 text-xs text-slate-400 overflow-auto max-h-60">
-                                                    {JSON.stringify(msg.data.slice(0, 5), null, 2)}
-                                                </pre>
-                                            )}
-                                        </div>
+                                                    {activeTab === 'clusters' && (
+                                                        <div className="h-[400px]">
+                                                            <ClusterMap
+                                                                data={msg.data}
+                                                                onPointSelect={(point) => {
+                                                                    const idx = msg.data.indexOf(point);
+                                                                    if (idx !== -1) {
+                                                                        setSelectedWindowIndex(idx);
+                                                                        // Optional: switch to Brain view to see it? 
+                                                                        // Or just stay here. Maybe stay here is better for exploration.
+                                                                    }
+                                                                }}
+                                                            />
+                                                        </div>
+                                                    )}
+
+                                                    {activeTab === 'raw' && (
+                                                        <pre className="p-3 text-xs text-slate-400 overflow-auto max-h-60">
+                                                            {JSON.stringify(msg.data.slice(0, 5), (key, value) =>
+                                                                typeof value === 'bigint' ? value.toString() : value
+                                                                , 2)}
+                                                        </pre>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                )}
-                            </div>
-                        </motion.div>
-                    ))}
+                                </motion.div>
+                            ))
+                        )}
+                    </AnimatePresence>
 
                     {processing && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
@@ -413,19 +490,12 @@ export default function Workspace() {
                             disabled={processing}
                         />
                         <button
-                            onClick={handleSend}
+                            onClick={() => handleSend()}
                             disabled={processing || !input.trim()}
                             className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl px-4 flex items-center justify-center transition-colors"
                         >
                             <Send className="w-5 h-5" />
                         </button>
-                    </div>
-                    <div className="max-w-4xl mx-auto mt-2 flex gap-4 text-xs text-slate-500 justify-center">
-                        <span>Try: &ldquo;Subject s01 alpha power&rdquo;</span>
-                        <span>•</span>
-                        <span>&ldquo;Highest beta channel&rdquo;</span>
-                        <span>•</span>
-                        <span>&ldquo;Correlate entropy and theta&rdquo;</span>
                     </div>
                 </div>
             </div>
@@ -446,7 +516,7 @@ function parseChannelData(data: Record<string, unknown>[]): Record<string, numbe
         const result: Record<string, number> = {};
         // Find the first numerical key that isn't 'channel' or 'subject' or 'window_idx'
         const valueKey = Object.keys(data[0]).find(k =>
-            k !== 'channel' && k !== 'subject' && k !== 'window_idx' && typeof data[0][k] === 'number'
+            k !== 'channel' && k !== 'subject' && k !== 'window_idx' && (typeof data[0][k] === 'number' || typeof data[0][k] === 'bigint')
         );
 
         if (valueKey) {
@@ -470,8 +540,8 @@ function parseChannelData(data: Record<string, unknown>[]): Record<string, numbe
     let found = false;
 
     potentialChannels.forEach(ch => {
-        if (ch in row && typeof row[ch] === 'number') {
-            result[ch] = row[ch];
+        if (ch in row && (typeof row[ch] === 'number' || typeof row[ch] === 'bigint')) {
+            result[ch] = Number(row[ch]);
             found = true;
         }
     });

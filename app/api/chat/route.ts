@@ -23,21 +23,6 @@ DATASET SCHEMA:
 - features table:
   - subject (string), channel (string), window_idx (int), window_start (float), window_end (float)
   - alpha_power, beta_power, theta_power, delta_power, gamma_power (floats)
-  - spectral_entropy, dfa_alpha, mean_val, var_val, skewness, kurtosis, energy (floats)
-- subjects table:
-  - subject (string), n_windows (int), avg_alpha, avg_beta, avg_theta, avg_dfa, avg_entropy (floats)
-
-CHANNELS: Fp1, Fp2, F3, F4, F7, F8, T3, T4, C3, C4, T5, T6, P3, P4, O1, O2, Fz, Cz, Pz
-
-DECISION RULES:
-1. If the question is conceptual/explanatory → Return {"sql": null, "thought": "This is a conceptual question that doesn't require SQL"}
-2. If asking about methodology/neuroscience → Return {"sql": null, "thought": "Answering based on domain knowledge"}
-3. Only generate SQL when explicitly asking for statistics, numbers, or data queries
-
-SQL GENERATION RULES (when needed):
-- ALWAYS validate SQL is complete and safe
-- Use 'features' or 'subjects' as table names
-- NEVER output None, undefined, or empty SQL
 - Limit to 100 rows unless specified
 - For channel comparisons: GROUP BY channel
 - For subject analysis: GROUP BY subject or filter WHERE subject='sXX'
@@ -87,12 +72,14 @@ ERROR HANDLING:
 - Stay within EEG cognitive workload domain
 
 RESPONSE STYLE:
-- Concise, professional, neuroscience-focused
-- Do not use Emojis.
-- Use standard Markdown (bold, lists) for formatting.
-- Interpret patterns in terms of cognitive workload
-- Reference specific channels and their functional roles
-- Connect findings to mental arithmetic task demands`;
+- **Tone**: Friendly, educational, and accessible. Speak like a neuroscientist explaining to a curious non-expert.
+- **Formatting**: USE DOUBLE LINE BREAKS between paragraphs for clear readability. Use **bold** for key terms.
+- **Clarity**: Avoid dense jargon. If you use a term like "Alpha Power", explain it simply (e.g., "Alpha power, which typically means relaxation...").
+- **Structure**:
+  1. **Direct Answer**: Start with a clear 1-sentence answer to the user's question.
+  2. **Evidence**: Briefly mention the data patterns (e.g., "I saw high activity in the front of the brain...").
+  3. **Meaning**: Explain what this means for cognitive state (e.g., "This suggests deep focus...").
+- Connect findings to the 'Mental Arithmetic' task context.`;
 
             const completion = await groq.chat.completions.create({
                 messages: [

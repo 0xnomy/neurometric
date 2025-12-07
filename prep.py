@@ -188,6 +188,81 @@ def extract_window_features(window_data: np.ndarray, channel: str, fs: float) ->
     
     return features
 
+from sklearn.preprocessing import StandardScaler
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+
+# ... existing imports ...
+
+def compute_clusters(df: pd.DataFrame) -> pd.DataFrame:
+    """Apply K-Means and PCA to feature vectors"""
+    print("\n[ML] Computing Cognitive State Clusters...")
+    
+    # Select features for clustering
+    # We aggregate across channels for a "Whole Brain State", or use specific key channels?
+    # Strategy: Use the mean of all channels for each window, or flatten?
+    # Simpler: The 'silver' table has one row per Channel per Window. 
+    # To cluster "Time Windows", we need to pivot (Window x Features).
+    # BUT, we want to tag each row. 
+    # Let's cluster based on the features available in that row (Local State)
+    # OR better: Cluster the *Time Points* (Subject + WindowIdx)
+    
+    # 1. Pivot to get (n_windows, n_channels * n_features) - wide format
+    # This is correct for "Brain State" clustering.
+    
+    print("  Pivoting for whole-brain state analysis...")
+    pivot_cols = ['alpha_power', 'beta_power', 'theta_power', 'delta_power', 'spectral_entropy']
+    
+    # We need a unique ID for each window
+    df['window_uid'] = df['subject'] + '_' + df['window_idx'].astype(str)
+    
+    # Pivot: Index=window_uid, Columns=Channel*Feature
+    # This might be heavy. Let's try clustering row-wise (Channel State) first?
+    # No, "Cognitive State" is global.
+    
+    wide_df = df.pivot(index='window_uid', columns='channel', values=pivot_cols)
+    wide_df.columns = [f"{c[1]}_{c[0]}" for c in wide_df.columns] # Flatten (e.g. Fp1_alpha)
+    
+    # Drop rows with NaNs
+    wide_df = wide_df.dropna()
+    
+    if len(wide_df) < 50:
+        print("  ! Not enough data for clustering")
+        return df
+    
+    # 2. Scale
+    scaler = StandardScaler()
+    X = scaler.fit_transform(wide_df)
+    
+    # 3. PCA for Viz
+    pca = PCA(n_components=2)
+    X_pca = pca.fit_transform(X)
+    
+    # 4. KMeans
+    # k=4: Resting, Focus, Distracted, Drowsy (hypothetically)
+    kmeans = KMeans(n_clusters=4, random_state=42, n_init=10)
+    clusters = kmeans.fit_predict(X)
+    
+    # 5. Join back
+    results = pd.DataFrame({
+        'window_uid': wide_df.index,
+        'cluster_id': clusters,
+        'pca_x': X_pca[:, 0],
+        'pca_y': X_pca[:, 1]
+    })
+    
+    print(f"  ✓ Clustered {len(results)} windows into 4 states")
+    
+    # Merge back to original long DF
+    merged = df.merge(results, on='window_uid', how='left')
+    
+    # Fill NaN for windows that were dropped (if any) with -1
+    merged['cluster_id'] = merged['cluster_id'].fillna(-1).astype(int)
+    merged['pca_x'] = merged['pca_x'].fillna(0.0)
+    merged['pca_y'] = merged['pca_y'].fillna(0.0)
+    
+    return merged.drop(columns=['window_uid'])
+
 def create_silver_features(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
     """Window EEG data and extract features"""
     print("\n[SILVER] Extracting windowed features...")
@@ -239,6 +314,10 @@ def create_silver_features(con: duckdb.DuckDBPyConnection) -> pd.DataFrame:
         print(f"    ✓ {window_count} windows extracted")
     
     features_df = pd.DataFrame(all_features)
+    
+    # --- ML STEP ---
+    features_df = compute_clusters(features_df)
+    # ----------------
     
     # Register in DuckDB
     con.register('silver_features', features_df)

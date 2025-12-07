@@ -1,41 +1,55 @@
-# NeuroMetric
+# NeuroMetric: Cognitive Workload Lakehouse
 
-**A Client-Side Agentic RAG Lakehouse for EEG Data Analysis**
+**Analyze 100+ hours of EEG data instantly in your browser.**
 
-NeuroMetric is a sophisticated web-based platform designed to democratize EEG analysis. By leveraging a "Static Lakehouse" architecture, it transforms complex physiological data into an interactive, zero-latency analytics experience directly in the browser.
+NeuroMetric is a Next.js-based "Static Lakehouse" that performs real-time analysis of cognitive workload data. By running an embedded column-store database (**DuckDB-Wasm**) directly in the client, it enables zero-latency SQL queries over millions of EEG data points without backend processing.
 
-## Key Features
+It is enhanced by an **Agentic interface** powered by Llama 3 and Groq, capable of writing its own SQL to answer natural language questions (e.g., *"Which subjects showed the highest frontal beta power?"*).
 
-*   **Zero-Latency Analysis**: Powered by DuckDB-Wasm, enabling SQL queries on millions of data points purely client-side without server roundtrips.
-*   **Agentic RAG**: Integrates Llama 3 70B (via Groq) to convert natural language questions into precise SQL queries for instant statistical insights.
-*   **Interactive Visuals**: Features a custom HTML5 Canvas neural network background that reacts to connectivity (synaptic) events.
-*   **36-Subject Dataset**: Built-in specialized dataset from the PhysioNet "Mental Arithmetic Task" study (Zyma et al., 2019).
-*   **Detailed Methodology**: Transparent documentation of the signal processing pipeline (Welch's PSD, Spectral Entropy, DFA).
+![NeuroMetric Dashboard](https://github.com/0xnomy/neurometric/raw/main/public/dashboard-preview.png)
 
-## Program Flow
+## 🚀 Key Features
 
-The system operates on a unique "Pre-baked" architecture to ensure high performance on edge devices (browsers).
+*   **Client-Side Lakehouse**: Full SQL processing in the browser using DuckDB-Wasm. Parquet files are cached locally for sub-millisecond query performance.
+*   **Generative UI**: The interface dynamically adapts to data. It generates:
+    *   **3D Brain Models**: Interactive glowing cortex visualization for channel-level activity.
+    *   **Topographic Maps**: Standard 10-20 heatmap projections using D3.js.
+    *   **Dynamic Tables**: Sortable, raw data views for granular inspection.
+*   **Semantic Search (RAG)**: Integrates a **FAISS vector store** and specific embedding models to conduct semantic search over EEG feature descriptions.
+*   **Neuroscience-Aware Agents**: The LLM is prompt-engineered with deep domain knowledge (alpha/beta bands, frontal vs. occipital roles) to interpret results in real-time.
 
-1.  **Data Ingestion (Bronze Layer)**
-    *   The `prep.py` pipeline ingests raw CSV files from 36 subjects (19 channels, 500Hz).
-    *   Data is cleaned and downsampled to 250Hz.
+## 🛠️ Architecture
 
-2.  **Feature Extraction (Silver Layer)**
-    *   **Spectral Analysis**: 2-second sliding windows (50% overlap) are processed using Welch's Method.
-    *   **Feature Vectors**: Power is extracted for Delta, Theta, Alpha, Beta, and Gamma bands.
-    *   **Complexity Metrics**: Spectral Entropy and Detrended Fluctuation Analysis (DFA) are computed.
+The system operates on a unique "Pre-baked" architecture:
 
-3.  **Analytics Marts (Gold Layer)**
-    *   Data is aggregated into optimized Parquet files (`eeg_features.parquet`, `eeg_subjects.parquet`).
-    *   These files are static assets served via a CDN.
+### 1. The Bronze/Silver Layer (Python Pipeline)
+*   **Ingestion**: Raw EEG CSVs (36 subjects, 19 channels) from the [Mental Arithmetic Task Dataset](https://physionet.org/content/eegmat/1.0.0/).
+*   **Processing**:
+    *   **Welch's Method**: Extracts Power Spectral Density (PSD) for Delta, Theta, Alpha, Beta, Gamma bands.
+    *   **Complexity**: Computes Spectral Entropy and Detrended Fluctuation Analysis (DFA) alpha.
+    *   **Embeddings**: Text narratives of features are encoded using `all-MiniLM-L6-v2` and indexed in FAISS for RAG.
+*   **Output**: Optimized `.parquet` files.
 
-4.  **Client-Side Execution**
-    *   **Browser**: The Next.js application boots and initializes DuckDB-Wasm.
-    *   **Hydration**: The Gold Layer Parquet files are fetched and loaded into the in-memory DuckDB instance.
-    *   **Inference**: User questions are sent to the Groq API (Llama 3), which returns SQL queries.
-    *   **Result**: DuckDB executes the SQL locally, and results are visualized instantly.
+### 2. The Gold Layer (Next.js Application)
+*   **Engine**: DuckDB-Wasm loads the Parquet artifacts into Virtual Memory.
+*   **Visualization Stack**:
+    *   **@react-three/fiber**: 3D Brain visualization.
+    *   **D3.js & d3-tricontour**: Topographic heatmaps.
+    *   **Framer Motion**: Smooth UI transitions.
+*   **Inference**:
+    *   **Planning Agent**: Translates user intent -> SQL.
+    *   **Insight Agent**: Translates SQL Result -> Cognitive Insight.
 
-## Getting Started
+## 📦 Tech Stack
+
+- **Framework**: Next.js 14 (App Router)
+- **Database**: DuckDB-Wasm
+- **AI/LLM**: Llama 3.3 70B via Groq SDK
+- **Vector Store**: FAISS (IndexFlatL2)
+- **Visualization**: React Three Fiber, D3.js, Lucide React
+- **Styling**: Tailwind CSS
+
+## ⚡ Getting Started
 
 1.  **Clone the Repository**
     ```bash
@@ -46,35 +60,33 @@ The system operates on a unique "Pre-baked" architecture to ensure high performa
 2.  **Install Dependencies**
     ```bash
     npm install
-    # AND
-    pip install pandas numpy scipy polars duckdb sentence-transformers faiss-cpu
+    # For data pipeline (optional):
+    pip install pandas numpy scipy duckdb sentence-transformers faiss-cpu
     ```
 
-3.  **Run the Data Pipeline** (Optional if Parquet files exist)
-    ```bash
-    python prep.py
+3.  **Configure API Keys**
+    Create a `.env.local` file:
+    ```env
+    GROQ_API_KEY=your_groq_key_here
     ```
 
-4.  **Start the Development Server**
+4.  **Run Development Server**
     ```bash
     npm run dev
     ```
-    Open [http://localhost:3000](http://localhost:3000) with your browser.
+    Visit `http://localhost:3000`.
 
-## Environment Variables
+## 🧪 Example Queries to Try
 
-Create a `.env.local` file in the root directory:
+*   *"Show me the distribution of alpha power."* (Visualization: Topomap)
+*   *"Who are the top 5 subjects with high entropy?"* (Visualization: Table)
+*   *"How does frontal beta power in subject s04 compare to occipital alpha?"* (Visualization: Mult-channel)
+*   *"Explain the role of the Fz electrode."* (Agentic Chat)
 
-```env
-GROQ_API_KEY=your_groq_api_key_here
-```
-
-Get your Groq API key from [https://console.groq.com/keys](https://console.groq.com/keys)
-
-## Dataset Citation
+## 📄 Dataset Citation
 
 > Zyma I, Tukaev S, Seleznov I, Kiyono K, Popov A, Chernykh M, Shpenkov O. Electroencephalograms during Mental Arithmetic Task Performance. Data. 2019; 4(1):14. https://doi.org/10.3390/data4010014
 
-## License
+## 📜 License
 
-Distributed under the MIT License. See `LICENSE` for more information.
+MIT License.
