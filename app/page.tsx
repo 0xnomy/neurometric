@@ -30,23 +30,23 @@ export default function LandingPage() {
               NeuroMetric
             </span>
           </div>
-          <div className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-400">
+          <div className="hidden md:flex items-center gap-4 lg:gap-6 text-sm font-medium text-slate-400">
             <Link href="/about" className="hover:text-white transition-colors">About</Link>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <button onClick={() => setShowDocumentation(true)} className="hover:text-white transition-colors">Methodology</button>
-            <Link href="/upload" className="flex items-center gap-2 hover:text-white transition-colors">
+            <Link href="/upload" className="hidden lg:flex items-center gap-2 hover:text-white transition-colors">
               <Upload className="w-4 h-4" /> Upload Data
             </Link>
             <a href="https://github.com/0xnomy/neurometric" target="_blank" className="flex items-center gap-2 hover:text-white transition-colors">
-              <Github className="w-4 h-4" /> GitHub
+              <Github className="w-4 h-4" />
             </a>
           </div>
           <Link
             href="/workspace"
-            className="group flex items-center gap-2 px-5 py-2.5 bg-white text-slate-950 rounded-full font-semibold hover:bg-slate-200 transition-all hover:scale-105 active:scale-95"
+            className="group flex items-center gap-1.5 px-4 py-2 md:px-5 md:py-2.5 bg-white text-slate-950 rounded-full text-sm md:text-base font-semibold hover:bg-slate-200 transition-all hover:scale-105 active:scale-95"
           >
-            Launch Workspace
-            <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            <span className="hidden sm:inline">Launch </span>Workspace
+            <ArrowRight className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:translate-x-1 transition-transform" />
           </Link>
         </nav>
 

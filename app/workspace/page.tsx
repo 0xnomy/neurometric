@@ -56,7 +56,16 @@ export default function Workspace() {
 
         const startDB = async () => {
             try {
-                setLoadingStep('Booting DuckDB-Wasm...');
+                // Detect mobile device
+                const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || window.innerWidth < 768;
+                
+                setLoadingStep(isMobile ? 'Loading (Mobile)...' : 'Booting DuckDB-Wasm...');
+                
+                // Add delay on mobile to prevent overwhelming the device
+                if (isMobile) {
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                }
+                
                 const database = await initDuckDB();
                 if (!active) return;
 
@@ -71,16 +80,22 @@ export default function Workspace() {
                 }
                 setConn(connection);
 
-                setLoadingStep('Mounting Parquet Tables...');
-                // Load Tables via HTTP with parquet extension pre-loaded
+                setLoadingStep('Loading Data...');
                 const baseUrl = window.location.origin;
 
-                // Register parquet extension without INSTALL (use bundled version)
-                await connection.query(`
-          LOAD httpfs;
-          CREATE TABLE features AS SELECT * FROM read_parquet('${baseUrl}/eeg_features.parquet');
-          CREATE TABLE subjects AS SELECT * FROM read_parquet('${baseUrl}/eeg_subjects.parquet');
-        `);
+                // Load tables one at a time on mobile for better memory management
+                await connection.query(`LOAD httpfs;`);
+                
+                if (isMobile) {
+                    await connection.query(`CREATE TABLE features AS SELECT * FROM read_parquet('${baseUrl}/eeg_features.parquet');`);
+                    await new Promise(resolve => setTimeout(resolve, 300));
+                    await connection.query(`CREATE TABLE subjects AS SELECT * FROM read_parquet('${baseUrl}/eeg_subjects.parquet');`);
+                } else {
+                    await connection.query(`
+                        CREATE TABLE features AS SELECT * FROM read_parquet('${baseUrl}/eeg_features.parquet');
+                        CREATE TABLE subjects AS SELECT * FROM read_parquet('${baseUrl}/eeg_subjects.parquet');
+                    `);
+                }
 
                 if (active) {
                     setLoadingStep('Ready');
@@ -191,10 +206,20 @@ export default function Workspace() {
         );
     }
 
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
     return (
-        <div className="h-screen bg-slate-950 text-slate-200 flex">
-            {/* Sidebar (Simple for now) */}
-            <div className="w-64 bg-slate-900 border-r border-slate-800 p-4 flex flex-col gap-4">
+        <div className="h-screen bg-slate-950 text-slate-200 flex overflow-hidden">
+            {/* Mobile Menu Button */}
+            <button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                className="md:hidden fixed top-4 left-4 z-50 p-2 bg-slate-900 border border-slate-800 rounded-lg text-slate-400 hover:text-white"
+            >
+                <Activity className="w-5 h-5" />
+            </button>
+
+            {/* Sidebar */}
+            <div className={`${sidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0 fixed md:relative z-40 w-64 bg-slate-900 border-r border-slate-800 p-4 flex flex-col gap-4 transition-transform duration-300 h-full`}>
                 <div className="flex items-center gap-2 text-indigo-400 font-bold text-lg">
                     <Brain className="w-6 h-6" /> NeuroMetric
                 </div>
@@ -243,11 +268,19 @@ export default function Workspace() {
                 </div>
             </div>
 
+            {/* Overlay for mobile */}
+            {sidebarOpen && (
+                <div
+                    onClick={() => setSidebarOpen(false)}
+                    className="md:hidden fixed inset-0 bg-black/50 z-30"
+                />
+            )}
+
             {/* Main Content */}
-            <div className="flex-1 flex flex-col min-w-0">
+            <div className="flex-1 flex flex-col min-w-0 w-full">
 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 md:space-y-6 pt-16 md:pt-6">
                     <AnimatePresence mode="popLayout">
                         {messages.length === 0 ? (
                             <motion.div
@@ -260,16 +293,16 @@ export default function Workspace() {
                                     <div className="w-20 h-20 bg-indigo-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 ring-1 ring-indigo-500/30">
                                         <Brain className="w-10 h-10 text-indigo-400" />
                                     </div>
-                                    <h1 className="text-4xl md:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 pb-2">
+                                    <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 via-purple-400 to-indigo-400 pb-2">
                                         NeuroMetric Engine
                                     </h1>
-                                    <p className="text-lg text-slate-400 leading-relaxed">
+                                    <p className="text-base md:text-lg text-slate-400 leading-relaxed">
                                         Your cognitive workload lakehouse is ready. I can analyze alpha/beta power,
                                         entropy patterns, and subject statistics from your 36-subject dataset.
                                     </p>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 w-full max-w-3xl">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 w-full max-w-3xl">
                                     {[
                                         { label: "Alpha Power Distribution", query: "Show me the distribution of alpha power across all subjects" },
                                         { label: "Frontal vs Occipital", query: "Compare average beta power between Frontal (F3, F4) and Occipital (O1, O2) channels" },
@@ -279,12 +312,12 @@ export default function Workspace() {
                                         <button
                                             key={i}
                                             onClick={() => handleSend(item.query)}
-                                            className="group flex flex-col items-start p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-xl transition-all duration-200 text-left"
+                                            className="group flex flex-col items-start p-3 md:p-4 bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-indigo-500/50 rounded-lg md:rounded-xl transition-all duration-200 text-left active:scale-95"
                                         >
-                                            <span className="text-sm font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">
+                                            <span className="text-xs md:text-sm font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">
                                                 {item.label}
                                             </span>
-                                            <span className="text-xs text-slate-500 mt-1 line-clamp-1">
+                                            <span className="text-[10px] md:text-xs text-slate-500 mt-1 line-clamp-1">
                                                 {item.query}
                                             </span>
                                         </button>
@@ -297,9 +330,9 @@ export default function Workspace() {
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     key={msg.id}
-                                    className={`flex gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                                    className={`flex gap-2 md:gap-4 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                                 >
-                                    <div className={`max-w-3xl rounded-2xl p-5 ${msg.role === 'user'
+                                    <div className={`max-w-full md:max-w-3xl rounded-xl md:rounded-2xl p-3 md:p-5 ${msg.role === 'user'
                                         ? 'bg-indigo-600 text-white'
                                         : 'bg-slate-900 border border-slate-800'
                                         }`}>
@@ -352,29 +385,29 @@ export default function Workspace() {
                                         )}
 
                                         {msg.data && msg.data.length > 0 && (
-                                            <div className="mt-4">
-                                                <div className="flex gap-2 mb-2">
+                                            <div className="mt-3 md:mt-4">
+                                                <div className="flex gap-1.5 md:gap-2 mb-2 overflow-x-auto pb-2 -mx-1 px-1">
                                                     <button
                                                         onClick={() => setActiveTab('table')}
-                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'table' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                        className={`text-[10px] md:text-xs px-2 md:px-3 py-1.5 md:py-1 rounded whitespace-nowrap ${activeTab === 'table' ? 'bg-slate-700 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                                                     >
                                                         Table
                                                     </button>
                                                     <button
                                                         onClick={() => setActiveTab('brain')}
-                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'brain' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                        className={`text-[10px] md:text-xs px-2 md:px-3 py-1.5 md:py-1 rounded whitespace-nowrap ${activeTab === 'brain' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                                                     >
                                                         3D Brain
                                                     </button>
                                                     <button
                                                         onClick={() => setActiveTab('topomap')}
-                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'topomap' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                        className={`text-[10px] md:text-xs px-2 md:px-3 py-1.5 md:py-1 rounded whitespace-nowrap ${activeTab === 'topomap' ? 'bg-emerald-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                                                     >
                                                         Topomap
                                                     </button>
                                                     <button
                                                         onClick={() => setActiveTab('clusters')}
-                                                        className={`text-xs px-2 py-1 rounded ${activeTab === 'clusters' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
+                                                        className={`text-[10px] md:text-xs px-2 md:px-3 py-1.5 md:py-1 rounded whitespace-nowrap ${activeTab === 'clusters' ? 'bg-purple-600 text-white' : 'text-slate-500 hover:text-slate-300'}`}
                                                     >
                                                         <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" /> Clusters</span>
                                                     </button>
@@ -418,7 +451,7 @@ export default function Workspace() {
                                                     )}
 
                                                     {activeTab === 'brain' && (
-                                                        <div className="h-[400px] relative">
+                                                        <div className="h-[300px] md:h-[400px] relative">
                                                             <ThreeBrain data={parseChannelData(msg.data || [])} metricLabel={msg.data && msg.data.length > 0 ? `${Object.keys(msg.data[0]).find(k => k !== 'channel' && k !== 'subject') || 'Activity'}` : undefined} />
                                                             {msg.data && msg.data.length > 1 && (
                                                                 <div className="absolute bottom-2 left-2 bg-black/50 p-1 text-[10px] rounded text-white font-mono">
@@ -429,13 +462,13 @@ export default function Workspace() {
                                                     )}
 
                                                     {activeTab === 'topomap' && (
-                                                        <div className="h-[400px] relative">
+                                                        <div className="h-[300px] md:h-[400px] relative">
                                                             <Topomap data={parseChannelData(msg.data || [])} />
                                                         </div>
                                                     )}
 
                                                     {activeTab === 'clusters' && msg.data && (
-                                                        <div className="h-full min-h-[400px] w-full p-4">
+                                                        <div className="h-full min-h-[300px] md:min-h-[400px] w-full p-2 md:p-4">
                                                             <ClusterMap
                                                                 data={msg.data}
                                                                 onPointSelect={(point) => {
@@ -478,23 +511,23 @@ export default function Workspace() {
                 </div>
 
                 {/* Input Area */}
-                <div className="p-4 bg-slate-900 border-t border-slate-800">
-                    <div className="max-w-4xl mx-auto flex gap-3">
+                <div className="p-3 md:p-4 bg-slate-900 border-t border-slate-800 safe-area-bottom">
+                    <div className="max-w-4xl mx-auto flex gap-2 md:gap-3">
                         <input
                             type="text"
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleSend()}
-                            placeholder="Describe the analysis you want to perform..."
-                            className="flex-1 bg-slate-950 border border-slate-700 rounded-xl px-4 py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm placeholder-slate-500"
+                            onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSend()}
+                            placeholder="Ask me about your EEG data..."
+                            className="flex-1 bg-slate-950 border border-slate-700 rounded-lg md:rounded-xl px-3 md:px-4 py-2.5 md:py-3 focus:outline-none focus:ring-2 focus:ring-indigo-500/50 text-xs md:text-sm placeholder-slate-500"
                             disabled={processing}
                         />
                         <button
                             onClick={() => handleSend()}
                             disabled={processing || !input.trim()}
-                            className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl px-4 flex items-center justify-center transition-colors"
+                            className="bg-indigo-600 hover:bg-indigo-500 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg md:rounded-xl px-3 md:px-4 flex items-center justify-center transition-all"
                         >
-                            <Send className="w-5 h-5" />
+                            <Send className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
                     </div>
                 </div>
