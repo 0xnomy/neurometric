@@ -193,12 +193,19 @@ export default function ClusterMap({ data, onPointSelect }: ClusterMapProps) {
     if (points.length === 0) {
         return (
             <div className="w-full h-full flex items-center justify-center bg-slate-900/50 border border-slate-800 rounded-lg">
-                <div className="text-center p-8">
-                    <Brain className="w-12 h-12 text-slate-600 mx-auto mb-4" />
-                    <div className="text-slate-400 text-sm font-semibold mb-2">No Cluster Data Available</div>
-                    <div className="text-slate-500 text-xs max-w-md">
-                        To see cognitive state clusters, try querying for full features:<br />
-                        <span className="text-indigo-400 font-mono mt-2 block">&ldquo;Show all features for subject s01&rdquo;</span>
+                <div className="text-center p-8 max-w-lg">
+                    <Brain className="w-14 h-14 text-slate-600 mx-auto mb-4" />
+                    <div className="text-slate-300 text-base font-bold mb-3">Cluster Map Needs PCA Data</div>
+                    <div className="text-slate-400 text-sm mb-4">
+                        This visualization requires queries that include <span className="text-indigo-400 font-mono">cluster_id</span>, <span className="text-indigo-400 font-mono">pca_x</span>, and <span className="text-indigo-400 font-mono">pca_y</span> fields.
+                    </div>
+                    <div className="bg-slate-800/50 p-4 rounded-lg border border-slate-700">
+                        <div className="text-slate-300 text-xs font-semibold mb-2">Try these queries:</div>
+                        <div className="space-y-2 text-left">
+                            <div className="text-indigo-400 font-mono text-xs">• &ldquo;Show all features for subject s01&rdquo;</div>
+                            <div className="text-indigo-400 font-mono text-xs">• &ldquo;Show me cognitive state clusters&rdquo;</div>
+                            <div className="text-indigo-400 font-mono text-xs">• &ldquo;What are the different mental states?&rdquo;</div>
+                        </div>
                     </div>
                 </div>
             </div>

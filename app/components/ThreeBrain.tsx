@@ -66,9 +66,16 @@ function Electrode({ position, value, rawValue, name, setHovered }: { position: 
 
     useFrame((state) => {
         if (meshRef.current) {
-            const baseScale = 0.08 + (value * 0.05);
+            // Scale correlates with normalized value (0-1)
+            const baseScale = 0.08 + (value * 0.1);
             const scale = isHovered ? baseScale * 1.5 : baseScale;
             meshRef.current.scale.setScalar(scale);
+            
+            // Intensity also correlates with normalized value
+            const material = meshRef.current.material as THREE.MeshStandardMaterial;
+            if (material) {
+                material.emissiveIntensity = isHovered ? 0.8 : (0.3 + value * 0.4);
+            }
         }
     });
 
@@ -102,12 +109,18 @@ function Electrode({ position, value, rawValue, name, setHovered }: { position: 
                 onPointerOut={() => { setIsHovered(false); setHovered(''); }}
             >
                 <sphereGeometry args={[1, 32, 32]} />
-                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={isHovered ? 0.8 : 0.4} roughness={0.2} metalness={0.8} />
+                <meshStandardMaterial color={color} emissive={color} emissiveIntensity={0.4} roughness={0.2} metalness={0.8} />
             </mesh>
             {isHovered && (
                 <Html distanceFactor={8}>
-                    <div className="bg-slate-900/90 text-white text-[10px] px-2 py-1 rounded border border-indigo-500 whitespace-nowrap z-50 pointer-events-none">
-                        {name}
+                    <div className="bg-slate-900/95 text-white text-[11px] px-3 py-1.5 rounded-lg border border-indigo-500 shadow-lg z-50 pointer-events-none">
+                        <div className="font-bold text-indigo-300">{name}</div>
+                        <div className="text-[10px] text-slate-300 mt-0.5">
+                            Value: <span className="text-yellow-400 font-mono">{rawValue.toFixed(3)}</span>
+                        </div>
+                        <div className="text-[9px] text-slate-400 mt-0.5">
+                            Intensity: {(value * 100).toFixed(0)}%
+                        </div>
                     </div>
                 </Html>
             )}
